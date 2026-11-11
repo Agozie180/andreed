@@ -10,7 +10,6 @@
 | Hermes catalog submission | [NousResearch/hermes-agent#153646](https://github.com/NousResearch/hermes-agent/pull/153646) |
 | Standalone plugin source | [Agozie180/andreed](https://github.com/Agozie180/andreed) |
 | Live-test self-audit | [AUDIT.md](AUDIT.md) |
-| Official judging brief | [Hermes Agent Plugin Hackathon — $20,000 in prizes](https://x.com/NousResearch/status/2118094256438936062) |
 
 > **The model may recommend an Android action, but it cannot invent the command or perform a mutation without the phone owner's explicit Hermes approval.**
 
@@ -35,8 +34,8 @@ routes every mutation through Hermes's approval boundary.
 
 ## Judging fit
 
-The official brief scores usefulness, reliability, polish and creativity, and
-favors plugins that do more than a prompt or skill could.
+Andreed is designed to be useful, reliable, polished and creative, with native
+capabilities that a prompt or skill alone cannot provide.
 
 | Criterion | Evidence in Andreed |
 |---|---|
@@ -87,12 +86,12 @@ ambiguous devices, shared UIDs, impossible trim targets and approval isolation.
 
 | Claim | Evidence | Reproduce |
 |---|---|---|
-| Plugin behavior and safety boundaries | 16 mocked-device tests pass across 6 CI combinations: Windows, macOS and Linux on Python 3.11 and 3.14 | `python -m unittest discover -s tests -v` and [the pinned-code CI run](https://github.com/Agozie180/andreed/actions/runs/43061164744) |
+| Plugin behavior and safety boundaries | 16 mocked-device tests pass across 6 CI combinations: Windows, macOS and Linux on Python 3.11 and 3.14 | `python -m unittest discover -s tests -v` and [the live-tested code CI run](https://github.com/Agozie180/andreed/actions/runs/43061164744) |
 | Hermes manifest, capabilities and security | Official plugin validator passed | `hermes plugins validate . --install-deps` |
 | Real Android compatibility | Read-only doctor and scan passed on Android 15 / SDK 35 over encrypted wireless ADB | Connect an authorized phone, then run `andreed_doctor` and `andreed_scan` |
 | Live scan breadth | 146 third-party packages enumerated; storage reported at 66% used during the test | Device-dependent; values will vary |
 | Oversized OEM netstats behavior | Live test found the historical detail exceeded the processing cap; fallback returned bounded since-boot totals and marked metered data unavailable | `test_oversized_detail_falls_back_to_bounded_since_boot_totals` |
-| Standalone release | GitHub Actions passes on the pinned repository commit | [Actions](https://github.com/Agozie180/andreed/actions) |
+| Standalone release | GitHub Actions passes on current `main` and the live-tested code commit | [Actions](https://github.com/Agozie180/andreed/actions) |
 
 The live verification was deliberately read-only. Mutating tools are tested
 through the fake ADB transport and still require a fresh Hermes approval on a
@@ -107,9 +106,10 @@ debugging on a phone you own, and accept Android's authorization prompt.
 hermes plugins install Agozie180/andreed --ref 951a7191d59455a2d2f0a740e3b898c283e692ad --enable
 ```
 
-That immutable commit is the live-tested code currently pinned by the catalog
-submission. After the catalog PR merges, the reviewed listing installs by name
-with `hermes plugins install andreed --enable`.
+That immutable commit is the live-tested code revision. The catalog submission
+pins the full reviewed tree, including this README and the self-audit. After the
+catalog PR merges, the reviewed listing installs by name with
+`hermes plugins install andreed --enable`.
 
 Start a new Hermes session and paste:
 
