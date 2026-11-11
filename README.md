@@ -47,11 +47,26 @@ device-wide, which can include caches belonging to system apps or other users.
 
 It never invokes `pm clear`, uninstalls apps, mutates system packages, accepts a
 raw shell command, enters credentials, or bypasses Hermes approvals. It stores
-no credentials, starts no daemon, sends no telemetry, and makes no third-party
-network requests. Only use it with a phone whose owner authorized debugging.
+no credentials, installs no background service, sends no telemetry, and makes
+no third-party network requests. ADB itself can run its standard local server.
+Only use Andreed with a phone whose owner authorized debugging.
 
-Network usage is approximate historical data from `dumpsys netstats`, not a
-live packet monitor. Force-stop is temporary. Cache trimming is best-effort.
+Network usage is approximate data from `dumpsys netstats`, not a live packet
+monitor. When a device's historical detail exceeds Andreed's processing cap,
+the scan discards that detail, requests the smaller since-boot summary, and
+explicitly marks metered usage unavailable. Force-stop is temporary. Cache
+trimming is best-effort.
+
+## Verified
+
+- 16 mocked-device tests cover parsing, safety gates, approval requests, shared
+  UIDs, bounded commands, cache trimming, and oversized netstats fallback.
+- Live read-only doctor and scan verified on Android 15 (SDK 35) over encrypted
+  wireless ADB. The live test exposed and now covers the oversized-netstats
+  fallback described above.
+- Mutating actions are tested with the fake transport and still require a fresh
+  Hermes approval on a real phone; the live verification did not alter apps or
+  settings.
 
 ## Development and tests
 

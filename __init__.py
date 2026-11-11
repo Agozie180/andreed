@@ -215,7 +215,7 @@ def _restricted_uids(device: Device) -> set[int]:
     )
 
 
-def _parse_netstats(output: str) -> dict[int, dict[str, int]]:
+def _parse_netstats(output: str) -> dict[int, dict[str, int | None]]:
     """Parse common Android netstats detail formats.
 
     AOSP commonly prints a UID/identity header followed by history buckets using
@@ -261,8 +261,47 @@ def _parse_netstats(output: str) -> dict[int, dict[str, int]]:
     return dict(totals)
 
 
-def _network_usage(device: Device) -> dict[int, dict[str, int]]:
-    return _parse_netstats(_shell(device, "dumpsys", "netstats", "detail", timeout=35))
+def _parse_netstats_summary(output: str) -> dict[int, dict[str, int | None]]:
+    """Parse Android's compact since-boot BPF UID totals.
+
+    Recent Android builds can emit megabytes of historical buckets for
+    ``dumpsys netstats detail``. The compact map stays within Andreed's parsing
+    cap on supported builds, but it cannot separate metered traffic, so those
+    fields remain explicitly unknown.
+    """
+    totals: dict[int, dict[str, int | None]] = {}
+    in_app_uid_stats = False
+    for raw in output.splitlines():
+        line = raw.strip()
+        if line == "mAppUidStatsMap:":
+            in_app_uid_stats = True
+            continue
+        if not in_app_uid_stats:
+            continue
+        if line.endswith(":") and line != "mAppUidStatsMap:":
+            break
+        columns = line.split()
+        if len(columns) != 5 or not all(value.isdigit() for value in columns):
+            continue
+        uid, rx_bytes, _, tx_bytes, _ = map(int, columns)
+        totals[uid] = {
+            "rx_bytes": rx_bytes,
+            "tx_bytes": tx_bytes,
+            "metered_rx_bytes": None,
+            "metered_tx_bytes": None,
+        }
+    return totals
+
+
+def _network_usage(device: Device) -> tuple[dict[int, dict[str, int | None]], str]:
+    try:
+        output = _shell(device, "dumpsys", "netstats", "detail", timeout=35)
+        return _parse_netstats(output), "historical_detail"
+    except AndreedError as exc:
+        if "too much output" not in str(exc):
+            raise
+    output = _shell(device, "dumpsys", "netstats", timeout=35)
+    return _parse_netstats_summary(output), "since_boot_summary"
 
 
 def _is_running(device: Device, package: str) -> bool:
@@ -304,28 +343,30 @@ def andreed_scan(args: dict, **kwargs: Any) -> str:
         for package, uid in packages.items():
             by_uid[uid].append(package)
         restricted = _restricted_uids(device)
-        usage = _network_usage(device)
+        usage, usage_scope = _network_usage(device)
         limit = max(1, min(int((args or {}).get("limit") or 15), 50))
         relevant_usage = {uid: traffic for uid, traffic in usage.items() if uid in by_uid}
         usage_available = bool(relevant_usage)
         rows = []
         for uid, package_names in by_uid.items():
             traffic = relevant_usage.get(uid)
-            total = None if traffic is None else traffic["rx_bytes"] + traffic["tx_bytes"]
+            rx_bytes = None if traffic is None else traffic["rx_bytes"]
+            tx_bytes = None if traffic is None else traffic["tx_bytes"]
+            total = None if rx_bytes is None or tx_bytes is None else rx_bytes + tx_bytes
+            metered_rx = None if traffic is None else traffic["metered_rx_bytes"]
+            metered_tx = None if traffic is None else traffic["metered_tx_bytes"]
             metered_total = (
-                None
-                if traffic is None
-                else traffic["metered_rx_bytes"] + traffic["metered_tx_bytes"]
+                None if metered_rx is None or metered_tx is None else metered_rx + metered_tx
             )
             rows.append(
                 {
                     "uid": uid,
                     "packages": sorted(package_names),
-                    "rx_bytes": None if traffic is None else traffic["rx_bytes"],
-                    "tx_bytes": None if traffic is None else traffic["tx_bytes"],
+                    "rx_bytes": rx_bytes,
+                    "tx_bytes": tx_bytes,
                     "total_bytes": total,
-                    "metered_rx_bytes": None if traffic is None else traffic["metered_rx_bytes"],
-                    "metered_tx_bytes": None if traffic is None else traffic["metered_tx_bytes"],
+                    "metered_rx_bytes": metered_rx,
+                    "metered_tx_bytes": metered_tx,
                     "metered_total_bytes": metered_total,
                     "metered_background_data_restricted": uid in restricted,
                 }
@@ -346,11 +387,19 @@ def andreed_scan(args: dict, **kwargs: Any) -> str:
             storage=_storage(device),
             third_party_app_count=len(packages),
             data_usage_available=usage_available,
+            data_usage_scope=usage_scope,
+            metered_data_usage_available=any(
+                traffic["metered_rx_bytes"] is not None for traffic in relevant_usage.values()
+            ),
             top_data_apps=selected,
             data_usage_note=(
                 "Approximate historical counters reported by Android dumpsys netstats, split into "
-                "total and metered traffic. They are not live bandwidth measurements and may be "
-                "unavailable or vary by Android build. Background policy applies to metered networks."
+                "total and metered traffic. They are not live bandwidth measurements; availability "
+                "varies by Android build. Background policy applies to metered networks."
+                if usage_scope == "historical_detail"
+                else "Bounded since-boot UID totals reported by Android dumpsys netstats. This build "
+                "returned too much historical detail, so Andreed did not process it and cannot report "
+                "a metered split. These are not live bandwidth measurements."
             ),
         )
     except (AndreedError, subprocess.TimeoutExpired, OSError, ValueError) as exc:

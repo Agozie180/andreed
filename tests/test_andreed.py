@@ -28,6 +28,12 @@ st=1700000000 rb=9000 rp=9 tb=1000 tp=2 op=0
 uid=10124 set=DEFAULT tag=0xf00
 st=1700000000 rb=99999 rp=1 tb=99999 tp=1 op=0
 """
+NETSTATS_SUMMARY = """mAppUidStatsMap:
+    uid rxBytes rxPackets txBytes txPackets
+    10123 4000 4 2000 2
+    10124 12000 12 3000 3
+  mStatsMapA:
+"""
 
 
 class FakeADB:
@@ -56,6 +62,8 @@ class FakeADB:
             stdout = DF.replace("300000", str(300000 if self.df_calls == 1 else 301000))
         elif tail[-3:] == ["dumpsys", "netstats", "detail"]:
             stdout = NETSTATS
+        elif tail[-2:] == ["dumpsys", "netstats"]:
+            stdout = NETSTATS_SUMMARY
         elif len(tail) >= 2 and tail[-2] == "pidof":
             if tail[-1] == "com.video.app":
                 stdout = "4242\n"
@@ -165,6 +173,21 @@ class AndreedTests(unittest.TestCase):
             result = self.payload(plugin.andreed_scan({"limit": 1}))
         self.assertTrue(result["success"])
         self.assertFalse(result["data_usage_available"])
+
+    def test_oversized_detail_falls_back_to_bounded_since_boot_totals(self):
+        def oversized_runner(argv, **kwargs):
+            completed = self.fake(argv, **kwargs)
+            if argv[-3:] == ["dumpsys", "netstats", "detail"]:
+                completed.stdout = "x" * (plugin.OUTPUT_LIMIT + 1)
+            return completed
+
+        with patch.object(plugin.subprocess, "run", side_effect=oversized_runner):
+            result = self.payload(plugin.andreed_scan({"limit": 1}))
+        self.assertTrue(result["success"])
+        self.assertEqual(result["data_usage_scope"], "since_boot_summary")
+        self.assertFalse(result["metered_data_usage_available"])
+        self.assertEqual(result["top_data_apps"][0]["total_bytes"], 15000)
+        self.assertIsNone(result["top_data_apps"][0]["metered_total_bytes"])
 
     def test_force_stop_uses_bounded_argv(self):
         result = self.payload(plugin.andreed_force_stop({"package": "com.chat.app"}))
