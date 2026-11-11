@@ -7,11 +7,11 @@ is routed through Hermes's approval system by the ``pre_tool_call`` hook.
 
 from __future__ import annotations
 
+import itertools
 import json
 import re
 import shutil
 import subprocess
-import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -23,6 +23,7 @@ DEFAULT_TIMEOUT_S = 20
 OUTPUT_LIMIT = 200_000
 PACKAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$")
 SERIAL_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
+_APPROVAL_NONCES = itertools.count()
 
 
 class AndreedError(RuntimeError):
@@ -527,7 +528,7 @@ def _approval(tool_name: str = "", args: dict | None = None, **kwargs: Any) -> d
     del kwargs
     values = args or {}
     serial = re.sub(r"[^A-Za-z0-9._:-]", "_", str(values.get("serial") or "auto-selected"))[:80]
-    nonce = time.time_ns()
+    nonce = next(_APPROVAL_NONCES)
     if tool_name == "andreed_force_stop":
         package = re.sub(r"[^A-Za-z0-9._]", "_", str(values.get("package") or "missing"))[:160]
         return {
