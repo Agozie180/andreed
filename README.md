@@ -9,6 +9,7 @@
 |---|---|
 | Hermes catalog submission | [NousResearch/hermes-agent#153646](https://github.com/NousResearch/hermes-agent/pull/153646) |
 | Standalone plugin source | [Agozie180/andreed](https://github.com/Agozie180/andreed) |
+| Judge testing guide | [JUDGE_GUIDE.md](JUDGE_GUIDE.md) |
 | Live-test self-audit | [AUDIT.md](AUDIT.md) |
 
 > **The model may recommend an Android action, but it cannot invent the command or perform a mutation without the phone owner's explicit Hermes approval.**
@@ -119,6 +120,9 @@ Start a new Hermes session and paste:
 
 Run `andreed_doctor` first if the phone is not detected. If multiple devices are
 attached, pass the exact serial reported by ADB.
+
+For expected results, a cancelled-approval proof, optional reversible testing
+and troubleshooting, follow the [judge testing guide](JUDGE_GUIDE.md).
 
 ## Tools
 
