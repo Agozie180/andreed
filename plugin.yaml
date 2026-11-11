@@ -1,0 +1,17 @@
+name: andreed
+version: "0.1.0"
+manifest_version: 2
+description: Deterministic Android phone health, background-data control and safe cache cleanup for Hermes Agent
+author: Chiagozie (Agozie180)
+license: MIT
+homepage: https://github.com/Agozie180/andreed
+tags: [android, adb, phone, storage, data-usage]
+requires_hermes: ">=0.21.6"
+provides_tools:
+  - andreed_doctor
+  - andreed_scan
+  - andreed_force_stop
+  - andreed_set_background_data
+  - andreed_trim_caches
+provides_hooks:
+  - pre_tool_call
